@@ -7,11 +7,19 @@ const resetBtn = document.getElementById('reset-btn');
 const statusBadge = document.getElementById('status-badge');
 const statusText = document.getElementById('status-text');
 const overlayMessage = document.getElementById('overlay-message');
+
 const studyTimerDisplay = document.getElementById('study-timer');
 const breakTimerDisplay = document.getElementById('break-timer');
 const sessionStatusDisplay = document.getElementById('session-status');
 const focusScoreDisplay = document.getElementById('focus-score');
 const focusProgress = document.getElementById('focus-progress');
+
+// History Elements
+const historyBtn = document.getElementById('history-btn');
+const historyModal = document.getElementById('history-modal');
+const closeHistoryBtn = document.getElementById('close-history');
+const historyList = document.getElementById('history-list');
+const clearHistoryBtn = document.getElementById('clear-history');
 
 // State
 let detector;
@@ -27,6 +35,67 @@ let sessionStartTime = 0;
 
 // Constants
 const BREAK_THRESHOLD = 2000; // ms to wait before switching to break mode (prevents flickering)
+
+// History Logic
+function saveSession() {
+    if (studyTime === 0 && breakTime === 0) return;
+
+    const session = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        studyTime,
+        breakTime,
+        score: calculateScore(studyTime, breakTime)
+    };
+
+    const history = getHistory();
+    history.unshift(session); // Add to beginning
+    localStorage.setItem('focus_history', JSON.stringify(history));
+}
+
+function getHistory() {
+    const stored = localStorage.getItem('focus_history');
+    return stored ? JSON.parse(stored) : [];
+}
+
+function calculateScore(study, breakT) {
+    const total = study + breakT;
+    return total > 0 ? Math.round((study / total) * 100) : 0;
+}
+
+function renderHistory() {
+    const history = getHistory();
+
+    if (history.length === 0) {
+        historyList.innerHTML = '<div class="empty-state">No sessions recorded yet</div>';
+        return;
+    }
+
+    historyList.innerHTML = history.map(session => {
+        const date = new Date(session.date).toLocaleDateString(undefined, {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        return `
+            <div class="history-item">
+                <div class="history-info">
+                    <div class="history-date">${date}</div>
+                    <div class="history-stats">
+                        <div class="stat-pill focus">
+                            <span>Focus:</span>
+                            <strong>${formatTime(session.studyTime)}</strong>
+                        </div>
+                        <div class="stat-pill break">
+                            <span>Break:</span>
+                            <strong>${formatTime(session.breakTime)}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="history-score">${session.score}%</div>
+            </div>
+        `;
+    }).join('');
+}
 
 // Initialize TensorFlow.js Face Detection
 async function setupDetector() {
@@ -203,7 +272,10 @@ stopBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to reset your session?')) {
+    if (confirm('Are you sure you want to end this session? It will be saved to history.')) {
+        // Save session before resetting
+        saveSession();
+
         isRunning = false;
         startBtn.disabled = false;
         stopBtn.disabled = true;
@@ -218,6 +290,30 @@ resetBtn.addEventListener('click', () => {
         updateStatus('idle');
         overlayMessage.classList.remove('hidden');
         overlayMessage.innerText = 'Ready to Start';
+    }
+});
+
+// History Event Listeners
+historyBtn.addEventListener('click', () => {
+    renderHistory();
+    historyModal.classList.remove('hidden');
+});
+
+closeHistoryBtn.addEventListener('click', () => {
+    historyModal.classList.add('hidden');
+});
+
+clearHistoryBtn.addEventListener('click', () => {
+    if (confirm('Are you sure you want to clear all history?')) {
+        localStorage.removeItem('focus_history');
+        renderHistory();
+    }
+});
+
+// Close modal on outside click
+historyModal.addEventListener('click', (e) => {
+    if (e.target === historyModal) {
+        historyModal.classList.add('hidden');
     }
 });
 

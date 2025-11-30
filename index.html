@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,6 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection"></script>
 </head>
+
 <body>
     <div class="app-container">
         <header>
@@ -21,9 +23,17 @@
                 <span class="logo-icon">◉</span>
                 <h1>Focus Room</h1>
             </div>
-            <div class="status-badge" id="status-badge">
-                <span class="status-dot"></span>
-                <span id="status-text">Waiting to start...</span>
+            <div class="header-controls">
+                <button id="history-btn" class="btn btn-ghost" title="View History">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path>
+                    </svg>
+                    History
+                </button>
+                <div class="status-badge" id="status-badge">
+                    <span class="status-dot"></span>
+                    <span id="status-text">Waiting to start...</span>
+                </div>
             </div>
         </header>
 
@@ -43,23 +53,27 @@
                     </div>
                     <div class="camera-controls">
                         <button id="start-btn" class="btn btn-primary">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
                             </svg>
                             Start Session
                         </button>
                         <button id="stop-btn" class="btn btn-secondary" disabled>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <rect x="6" y="4" width="4" height="16"></rect>
                                 <rect x="14" y="4" width="4" height="16"></rect>
                             </svg>
                             Pause
                         </button>
                         <button id="reset-btn" class="btn btn-ghost">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"></path>
                                 <path d="M3 3v9h9"></path>
                             </svg>
+                            End Session
                         </button>
                     </div>
                 </div>
@@ -68,7 +82,8 @@
                 <div class="stats-section">
                     <div class="timer-card focus-card">
                         <div class="card-header">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <circle cx="12" cy="12" r="6"></circle>
                                 <circle cx="12" cy="12" r="2"></circle>
@@ -83,7 +98,8 @@
 
                     <div class="timer-card break-card">
                         <div class="card-header">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <path d="M12 6v6l4 2"></path>
                             </svg>
@@ -107,6 +123,30 @@
             </div>
         </main>
     </div>
+    <!-- History Modal -->
+    <div id="history-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Session History</h2>
+                <button id="close-history" class="btn btn-ghost icon-only">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="history-list" class="history-list">
+                    <!-- History items will be injected here -->
+                    <div class="empty-state">No sessions recorded yet</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="clear-history" class="btn btn-danger-ghost">Clear History</button>
+            </div>
+        </div>
+    </div>
     <script src="app.js"></script>
 </body>
+
 </html>
