@@ -123,6 +123,26 @@
             </div>
         </main>
     </div>
+
+    <!-- Session Description Modal -->
+    <div id="description-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>End Session</h2>
+            </div>
+            <div class="modal-body">
+                <label for="session-description" class="input-label">What was this session about?</label>
+                <textarea id="session-description" class="session-textarea"
+                    placeholder="e.g., Math homework, Reading chapter 5, Coding project..." rows="4"></textarea>
+                <p class="helper-text">Optional - You can leave this blank or write a brief note</p>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-end-session" class="btn btn-ghost">Cancel</button>
+                <button id="confirm-end-session" class="btn btn-primary">Save Session</button>
+            </div>
+        </div>
+    </div>
+
     <!-- History Modal -->
     <div id="history-modal" class="modal-overlay hidden">
         <div class="modal-content">

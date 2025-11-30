@@ -21,6 +21,12 @@ const closeHistoryBtn = document.getElementById('close-history');
 const historyList = document.getElementById('history-list');
 const clearHistoryBtn = document.getElementById('clear-history');
 
+// Description Modal Elements
+const descriptionModal = document.getElementById('description-modal');
+const sessionDescriptionInput = document.getElementById('session-description');
+const confirmEndSessionBtn = document.getElementById('confirm-end-session');
+const cancelEndSessionBtn = document.getElementById('cancel-end-session');
+
 // State
 let detector;
 let isRunning = false;
@@ -31,21 +37,23 @@ let studyTime = 0; // in seconds
 let breakTime = 0; // in seconds
 let timerInterval;
 let isFacePresent = false;
-let sessionStartTime = 0;
+let sessionStartTime = null;
 
 // Constants
 const BREAK_THRESHOLD = 2000; // ms to wait before switching to break mode (prevents flickering)
 
 // History Logic
-function saveSession() {
+function saveSession(description = '') {
     if (studyTime === 0 && breakTime === 0) return;
 
     const session = {
         id: Date.now(),
-        date: new Date().toISOString(),
+        startTime: sessionStartTime,
+        endTime: new Date().toISOString(),
         studyTime,
         breakTime,
-        score: calculateScore(studyTime, breakTime)
+        score: calculateScore(studyTime, breakTime),
+        description: description.trim()
     };
 
     const history = getHistory();
@@ -72,14 +80,29 @@ function renderHistory() {
     }
 
     historyList.innerHTML = history.map(session => {
-        const date = new Date(session.date).toLocaleDateString(undefined, {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        const startDate = new Date(session.startTime || session.date);
+        const endDate = new Date(session.endTime || session.date);
+
+        const dateStr = startDate.toLocaleDateString(undefined, {
+            month: 'short', day: 'numeric'
         });
+
+        const startTime = startDate.toLocaleTimeString(undefined, {
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        const endTime = endDate.toLocaleTimeString(undefined, {
+            hour: '2-digit', minute: '2-digit'
+        });
+
+        const descriptionHTML = session.description
+            ? `<div class="session-description">"${session.description}"</div>`
+            : '';
 
         return `
             <div class="history-item">
                 <div class="history-info">
-                    <div class="history-date">${date}</div>
+                    <div class="history-date">${dateStr} • ${startTime} - ${endTime}</div>
                     <div class="history-stats">
                         <div class="stat-pill focus">
                             <span>Focus:</span>
@@ -90,6 +113,7 @@ function renderHistory() {
                             <strong>${formatTime(session.breakTime)}</strong>
                         </div>
                     </div>
+                    ${descriptionHTML}
                 </div>
                 <div class="history-score">${session.score}%</div>
             </div>
@@ -101,7 +125,7 @@ function renderHistory() {
 async function setupDetector() {
     const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
     const detectorConfig = {
-        runtime: 'tfjs', // or 'mediapipe'
+        runtime: 'tfjs',
         modelType: 'short'
     };
     detector = await faceDetection.createDetector(model, detectorConfig);
@@ -248,6 +272,11 @@ startBtn.addEventListener('click', async () => {
     // Always hide overlay when starting/resuming
     overlayMessage.classList.add('hidden');
 
+    // Track session start time
+    if (!sessionStartTime) {
+        sessionStartTime = new Date().toISOString();
+    }
+
     isRunning = true;
     startBtn.disabled = true;
     stopBtn.disabled = false;
@@ -272,25 +301,50 @@ stopBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
-    if (confirm('Are you sure you want to end this session? It will be saved to history.')) {
-        // Save session before resetting
-        saveSession();
+    // Show description modal instead of confirm dialog
+    descriptionModal.classList.remove('hidden');
+    sessionDescriptionInput.value = '';
+    sessionDescriptionInput.focus();
+});
 
-        isRunning = false;
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        clearInterval(timerInterval);
-        cancelAnimationFrame(animationId);
+// Description Modal Event Listeners
+confirmEndSessionBtn.addEventListener('click', () => {
+    const description = sessionDescriptionInput.value;
 
-        studyTime = 0;
-        breakTime = 0;
-        isFacePresent = false;
+    // Save session with description
+    saveSession(description);
 
-        updateDisplay();
-        updateStatus('idle');
-        overlayMessage.classList.remove('hidden');
-        overlayMessage.innerText = 'Ready to Start';
+    // Hide modal
+    descriptionModal.classList.add('hidden');
+
+    // Stop camera and release resources
+    if (video.srcObject) {
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
     }
+
+    // Reset session
+    isRunning = false;
+    isVideoReady = false;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    clearInterval(timerInterval);
+    cancelAnimationFrame(animationId);
+
+    studyTime = 0;
+    breakTime = 0;
+    isFacePresent = false;
+    sessionStartTime = null;
+
+    updateDisplay();
+    updateStatus('idle');
+    overlayMessage.classList.remove('hidden');
+    overlayMessage.innerText = 'Ready to Start';
+});
+
+cancelEndSessionBtn.addEventListener('click', () => {
+    descriptionModal.classList.add('hidden');
 });
 
 // History Event Listeners
@@ -314,6 +368,12 @@ clearHistoryBtn.addEventListener('click', () => {
 historyModal.addEventListener('click', (e) => {
     if (e.target === historyModal) {
         historyModal.classList.add('hidden');
+    }
+});
+
+descriptionModal.addEventListener('click', (e) => {
+    if (e.target === descriptionModal) {
+        descriptionModal.classList.add('hidden');
     }
 });
 
