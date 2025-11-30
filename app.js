@@ -27,6 +27,15 @@ const sessionDescriptionInput = document.getElementById('session-description');
 const confirmEndSessionBtn = document.getElementById('confirm-end-session');
 const cancelEndSessionBtn = document.getElementById('cancel-end-session');
 
+// Timestamp Elements
+// Timestamp Elements
+const timestampInput = document.getElementById('timestamp-input');
+const addTimestampBtn = document.getElementById('add-timestamp-btn');
+const currentTimestampsList = document.getElementById('current-session-timestamps');
+const openTimestampsBtn = document.getElementById('open-timestamps-btn');
+const timestampModal = document.getElementById('timestamp-modal');
+const closeTimestampsBtn = document.getElementById('close-timestamps');
+
 // State
 let detector;
 let isRunning = false;
@@ -38,6 +47,7 @@ let breakTime = 0; // in seconds
 let timerInterval;
 let isFacePresent = false;
 let sessionStartTime = null;
+let currentSessionTimestamps = [];
 
 // Constants
 const BREAK_THRESHOLD = 2000; // ms to wait before switching to break mode (prevents flickering)
@@ -53,7 +63,8 @@ function saveSession(description = '') {
         studyTime,
         breakTime,
         score: calculateScore(studyTime, breakTime),
-        description: description.trim()
+        description: description.trim(),
+        timestamps: currentSessionTimestamps
     };
 
     const history = getHistory();
@@ -117,8 +128,71 @@ function renderHistory() {
                 </div>
                 <div class="history-score">${session.score}%</div>
             </div>
+            </div>
+            ${renderSessionTimestamps(session)}
         `;
     }).join('');
+}
+
+function renderSessionTimestamps(session) {
+    const timestamps = session.timestamps;
+    if (!timestamps || timestamps.length === 0) return '';
+
+    return `
+        <div class="timestamps-wrapper">
+            <button class="btn-toggle-timestamps">
+                <span>Show Timestamps (${timestamps.length})</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="chevron-icon">
+                    <path d="M6 9l6 6 6-6"></path>
+                </svg>
+            </button>
+            <div class="history-timestamps hidden">
+                ${timestamps.map(t => `
+                    <div class="timestamp-item">
+                        <span class="timestamp-time">${t.relativeTime}</span>
+                        <span class="timestamp-note">${t.note}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Timestamp Logic
+function addTimestamp(note) {
+    if (!note.trim()) return;
+
+    const now = new Date();
+    const relativeSeconds = studyTime + breakTime;
+    const relativeTime = formatTime(relativeSeconds);
+
+    const timestamp = {
+        id: Date.now(),
+        relativeTime,
+        actualTime: now.toISOString(),
+        note: note.trim()
+    };
+
+    currentSessionTimestamps.push(timestamp);
+
+    // Update UI
+    const item = document.createElement('div');
+    item.className = 'timestamp-item';
+    item.innerHTML = `
+        <span class="timestamp-time">${relativeTime}</span>
+        <span class="timestamp-note">${timestamp.note}</span>
+    `;
+    currentTimestampsList.prepend(item); // Add new ones to top
+
+    // Clear input
+    timestampInput.value = '';
+}
+
+function toggleTimestampControls(enabled) {
+    openTimestampsBtn.disabled = !enabled;
+    if (!enabled) {
+        timestampModal.classList.add('hidden');
+    }
 }
 
 // Initialize TensorFlow.js Face Detection
@@ -201,6 +275,10 @@ function updateStatus(mode) {
         sessionStatusDisplay.innerText = 'Paused';
         sessionStatusDisplay.style.color = 'var(--text-muted)';
     }
+
+    // Disable timestamp input if paused or on break
+    const canAddTimestamp = mode === 'focus';
+    toggleTimestampControls(canAddTimestamp);
 }
 
 function formatTime(seconds) {
@@ -287,6 +365,12 @@ startBtn.addEventListener('click', async () => {
     // Start detection
     detectFaces();
     updateStatus('focus'); // Assume focus initially until detection proves otherwise
+
+    // Clear previous timestamps UI if starting fresh (not resuming)
+    if (studyTime === 0 && breakTime === 0) {
+        currentSessionTimestamps = [];
+        currentTimestampsList.innerHTML = '';
+    }
 });
 
 stopBtn.addEventListener('click', () => {
@@ -336,6 +420,8 @@ confirmEndSessionBtn.addEventListener('click', () => {
     breakTime = 0;
     isFacePresent = false;
     sessionStartTime = null;
+    currentSessionTimestamps = [];
+    currentTimestampsList.innerHTML = '';
 
     updateDisplay();
     updateStatus('idle');
@@ -375,6 +461,52 @@ descriptionModal.addEventListener('click', (e) => {
     if (e.target === descriptionModal) {
         descriptionModal.classList.add('hidden');
     }
+});
+
+timestampModal.addEventListener('click', (e) => {
+    if (e.target === timestampModal) {
+        timestampModal.classList.add('hidden');
+    }
+});
+
+// History List Event Delegation for Toggles
+historyList.addEventListener('click', (e) => {
+    const btn = e.target.closest('.btn-toggle-timestamps');
+    if (btn) {
+        const wrapper = btn.closest('.timestamps-wrapper');
+        const container = wrapper.querySelector('.history-timestamps');
+        const icon = btn.querySelector('.chevron-icon');
+        const textSpan = btn.querySelector('span');
+
+        container.classList.toggle('hidden');
+        btn.classList.toggle('active');
+
+        if (container.classList.contains('hidden')) {
+            textSpan.textContent = textSpan.textContent.replace('Hide', 'Show');
+        } else {
+            textSpan.textContent = textSpan.textContent.replace('Show', 'Hide');
+        }
+    }
+});
+
+// Timestamp Event Listeners
+addTimestampBtn.addEventListener('click', () => {
+    addTimestamp(timestampInput.value);
+});
+
+timestampInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        addTimestamp(timestampInput.value);
+    }
+});
+
+openTimestampsBtn.addEventListener('click', () => {
+    timestampModal.classList.remove('hidden');
+    timestampInput.focus();
+});
+
+closeTimestampsBtn.addEventListener('click', () => {
+    timestampModal.classList.add('hidden');
 });
 
 // Initial Setup
