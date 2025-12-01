@@ -48,6 +48,7 @@ let timerInterval;
 let isFacePresent = false;
 let sessionStartTime = null;
 let currentSessionTimestamps = [];
+let isTabVisible = true; // Track tab visibility
 
 // Constants
 const BREAK_THRESHOLD = 5000; // ms to wait before switching to break mode (more forgiving for movement)
@@ -295,7 +296,8 @@ function updateTimers() {
     const now = Date.now();
 
     // Check if face was detected recently (within threshold)
-    if (now - lastFaceDetectedTime < BREAK_THRESHOLD) {
+    // OR if tab is hidden (assume still studying on other tabs)
+    if (now - lastFaceDetectedTime < BREAK_THRESHOLD || !isTabVisible) {
         // User is studying
         if (!isFacePresent) {
             isFacePresent = true;
@@ -303,7 +305,7 @@ function updateTimers() {
         }
         studyTime++;
     } else {
-        // User is taking a break
+        // User is taking a break (only when tab is visible AND no face detected)
         if (isFacePresent) {
             isFacePresent = false;
             updateStatus('break');
@@ -572,19 +574,9 @@ closeTimestampsBtn.addEventListener('click', () => {
 });
 
 // Handle page visibility changes (tab switching)
+// Track visibility but keep timers running (user may be studying on other tabs)
 document.addEventListener('visibilitychange', () => {
-    if (!isRunning) return; // Only handle if session is running
-
-    if (document.hidden) {
-        // Tab is hidden - pause timers but keep detection state
-        clearInterval(timerInterval);
-        timerInterval = null;
-    } else {
-        // Tab is visible again - resume timers
-        if (!timerInterval) {
-            timerInterval = setInterval(updateTimers, 1000);
-        }
-    }
+    isTabVisible = !document.hidden;
 });
 
 // Auto-save on page unload
