@@ -50,7 +50,60 @@ let sessionStartTime = null;
 let currentSessionTimestamps = [];
 
 // Constants
-const BREAK_THRESHOLD = 2000; // ms to wait before switching to break mode (prevents flickering)
+const BREAK_THRESHOLD = 5000; // ms to wait before switching to break mode (more forgiving for movement)
+
+// Session Persistence Logic
+function saveCurrentSession() {
+    if (studyTime === 0 && breakTime === 0) return;
+
+    const currentSession = {
+        studyTime,
+        breakTime,
+        sessionStartTime,
+        lastFaceDetectedTime,
+        isFacePresent,
+        timestamps: currentSessionTimestamps
+    };
+
+    localStorage.setItem('focus_current_session', JSON.stringify(currentSession));
+}
+
+function restoreSession() {
+    const saved = localStorage.getItem('focus_current_session');
+    if (!saved) return false;
+
+    try {
+        const session = JSON.parse(saved);
+        studyTime = session.studyTime || 0;
+        breakTime = session.breakTime || 0;
+        sessionStartTime = session.sessionStartTime;
+        lastFaceDetectedTime = session.lastFaceDetectedTime || 0;
+        isFacePresent = session.isFacePresent || false;
+        currentSessionTimestamps = session.timestamps || [];
+
+        // Restore timestamps UI
+        currentTimestampsList.innerHTML = '';
+        currentSessionTimestamps.forEach(t => {
+            const item = document.createElement('div');
+            item.className = 'timestamp-item';
+            item.innerHTML = `
+                <span class="timestamp-time">${t.relativeTime}</span>
+                <span class="timestamp-note">${t.note}</span>
+            `;
+            currentTimestampsList.prepend(item);
+        });
+
+        updateDisplay();
+        return true;
+    } catch (error) {
+        console.error('Error restoring session:', error);
+        return false;
+    }
+}
+
+function clearCurrentSession() {
+    localStorage.removeItem('focus_current_session');
+}
 
 // History Logic
 function saveSession(description = '') {
@@ -70,6 +123,9 @@ function saveSession(description = '') {
     const history = getHistory();
     history.unshift(session); // Add to beginning
     localStorage.setItem('focus_history', JSON.stringify(history));
+
+    // Clear current session after saving to history
+    clearCurrentSession();
 }
 
 function getHistory() {
@@ -256,6 +312,9 @@ function updateTimers() {
     }
 
     updateDisplay();
+
+    // Auto-save current session every second
+    saveCurrentSession();
 }
 
 function updateStatus(mode) {
@@ -382,6 +441,9 @@ stopBtn.addEventListener('click', () => {
     updateStatus('paused');
     overlayMessage.classList.remove('hidden');
     overlayMessage.innerText = 'Session Paused';
+
+    // Save session when paused
+    saveCurrentSession();
 });
 
 resetBtn.addEventListener('click', () => {
@@ -509,9 +571,24 @@ closeTimestampsBtn.addEventListener('click', () => {
     timestampModal.classList.add('hidden');
 });
 
+// Auto-save on page unload
+window.addEventListener('beforeunload', () => {
+    if (isRunning || studyTime > 0 || breakTime > 0) {
+        saveCurrentSession();
+    }
+});
+
 // Initial Setup
 (async function init() {
     overlayMessage.innerText = 'Loading AI models...';
     await setupDetector();
-    overlayMessage.innerText = 'Ready to Start';
+
+    // Try to restore previous session
+    const restored = restoreSession();
+    if (restored) {
+        overlayMessage.innerText = 'Session Restored - Click Start to Resume';
+        overlayMessage.style.color = 'var(--success)';
+    } else {
+        overlayMessage.innerText = 'Ready to Start';
+    }
 })();
