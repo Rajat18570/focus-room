@@ -571,6 +571,22 @@ closeTimestampsBtn.addEventListener('click', () => {
     timestampModal.classList.add('hidden');
 });
 
+// Handle page visibility changes (tab switching)
+document.addEventListener('visibilitychange', () => {
+    if (!isRunning) return; // Only handle if session is running
+
+    if (document.hidden) {
+        // Tab is hidden - pause timers but keep detection state
+        clearInterval(timerInterval);
+        timerInterval = null;
+    } else {
+        // Tab is visible again - resume timers
+        if (!timerInterval) {
+            timerInterval = setInterval(updateTimers, 1000);
+        }
+    }
+});
+
 // Auto-save on page unload
 window.addEventListener('beforeunload', () => {
     if (isRunning || studyTime > 0 || breakTime > 0) {
