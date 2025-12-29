@@ -49,6 +49,7 @@ let isFacePresent = false;
 let sessionStartTime = null;
 let currentSessionTimestamps = [];
 let isTabVisible = true; // Track tab visibility
+let isManualBreak = false; // Track manual break state
 
 // Constants
 const BREAK_THRESHOLD = 5000; // ms to wait before switching to break mode (more forgiving for movement)
@@ -116,7 +117,8 @@ function saveSession(description = '') {
         endTime: new Date().toISOString(),
         studyTime,
         breakTime,
-        score: calculateScore(studyTime, breakTime),
+        studyTime,
+        breakTime,
         description: description.trim(),
         timestamps: currentSessionTimestamps
     };
@@ -134,10 +136,7 @@ function getHistory() {
     return stored ? JSON.parse(stored) : [];
 }
 
-function calculateScore(study, breakT) {
-    const total = study + breakT;
-    return total > 0 ? Math.round((study / total) * 100) : 0;
-}
+
 
 function renderHistory() {
     const history = getHistory();
@@ -183,7 +182,7 @@ function renderHistory() {
                     </div>
                     ${descriptionHTML}
                 </div>
-                <div class="history-score">${session.score}%</div>
+                </div>
             </div>
             </div>
             ${renderSessionTimestamps(session)}
@@ -289,6 +288,17 @@ async function setupCamera() {
     }
 }
 
+function stopCamera() {
+    if (video.srcObject) {
+        const tracks = video.srcObject.getTracks();
+        tracks.forEach(track => track.stop());
+        video.srcObject = null;
+        isVideoReady = false;
+        overlayMessage.innerText = 'Camera Paused';
+        overlayMessage.classList.remove('hidden');
+    }
+}
+
 // Timer Logic
 function updateTimers() {
     if (!isRunning) return;
@@ -297,7 +307,16 @@ function updateTimers() {
 
     // Check if face was detected recently (within threshold)
     // OR if tab is hidden (assume still studying on other tabs)
-    if (now - lastFaceDetectedTime < BREAK_THRESHOLD || !isTabVisible) {
+    const isUserPresent = (now - lastFaceDetectedTime < BREAK_THRESHOLD || !isTabVisible);
+
+    if (isManualBreak) {
+        // Manual break is active
+        if (isFacePresent) {
+            isFacePresent = false;
+            updateStatus('break');
+        }
+        breakTime++;
+    } else if (isUserPresent) {
         // User is studying
         if (!isFacePresent) {
             isFacePresent = true;
@@ -305,7 +324,7 @@ function updateTimers() {
         }
         studyTime++;
     } else {
-        // User is taking a break (only when tab is visible AND no face detected)
+        // User is taking a break (auto-detected)
         if (isFacePresent) {
             isFacePresent = false;
             updateStatus('break');
@@ -354,15 +373,8 @@ function updateDisplay() {
     breakTimerDisplay.innerText = formatTime(breakTime);
 
     // Calculate Focus Score
-    const totalTime = studyTime + breakTime;
-    if (totalTime > 0) {
-        const score = Math.round((studyTime / totalTime) * 100);
-        focusScoreDisplay.innerText = `${score}%`;
-        focusProgress.style.width = `${score}%`;
-    } else {
-        focusScoreDisplay.innerText = '--';
-        focusProgress.style.width = '0%';
-    }
+    // Calculate Focus Score - REMOVED
+
 }
 
 // Detection Loop
@@ -425,6 +437,8 @@ startBtn.addEventListener('click', async () => {
 
     // Start detection
     detectFaces();
+
+    isManualBreak = false; // Ensure manual break is off
     updateStatus('focus'); // Assume focus initially until detection proves otherwise
 
     // Clear previous timestamps UI if starting fresh (not resuming)
@@ -432,20 +446,48 @@ startBtn.addEventListener('click', async () => {
         currentSessionTimestamps = [];
         currentTimestampsList.innerHTML = '';
     }
+
+    // Reset button text just in case
+    stopBtn.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+        I need a break
+    `;
 });
 
-stopBtn.addEventListener('click', () => {
-    isRunning = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    clearInterval(timerInterval);
-    cancelAnimationFrame(animationId);
-    updateStatus('paused');
-    overlayMessage.classList.remove('hidden');
-    overlayMessage.innerText = 'Session Paused';
+stopBtn.addEventListener('click', async () => {
+    if (!isManualBreak) {
+        // Start manual break
+        isManualBreak = true;
+        updateStatus('break');
+        stopCamera(); // Stop camera on break
+        stopBtn.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6L6 18M6 6l12 12"></path>
+            </svg>
+            Break is on
+        `;
+    } else {
+        // End manual break (resume focus)
+        isManualBreak = false;
+        updateStatus('focus');
 
-    // Save session when paused
-    saveCurrentSession();
+        // Restart camera
+        overlayMessage.innerText = 'Resuming camera...';
+        await setupCamera();
+        isVideoReady = true;
+        overlayMessage.classList.add('hidden');
+
+        stopBtn.innerHTML = `
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+            I need a break
+        `;
+    }
 });
 
 resetBtn.addEventListener('click', () => {
